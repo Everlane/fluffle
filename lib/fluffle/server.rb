@@ -63,7 +63,7 @@ module Fluffle
       begin
         id, method, params = self.decode payload
 
-        raise Errors::InvalidRequestError.new("Missing `method' Request object member") unless method
+        validate_request method: method
 
         result = handler.call id: id,
                               method: method,
@@ -97,6 +97,11 @@ module Fluffle
       params = payload['params']
 
       [id, method, params]
+    end
+
+    # Raises if elements of the request do not comply with the spec
+    def validate_request(request)
+      raise Errors::InvalidRequestError.new("Missing `method' Request object member") unless request[:method]
     end
 
     # Convert a Ruby error into a hash complying with the JSON-RPC spec

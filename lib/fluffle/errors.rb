@@ -1,10 +1,6 @@
 module Fluffle
   module Errors
     class BaseError < StandardError
-      # Longer-form description that may be present in the `data` field of the
-      # `Error` response object
-      attr_reader :description
-
       def to_response
         {
           'code'    => self.code,
@@ -12,13 +8,34 @@ module Fluffle
           'data'    => self.data
         }
       end
+    end
+
+    # Raise this within your own code to get an error that will be faithfully
+    # translated into the code, message, and data member fields of the
+    # spec's `Error` response object
+    class CustomError < BaseError
+      attr_accessor :data
+
+      def initialize(code: 0, message:, data: nil)
+        @code = code
+        @data = data
+
+        super message
+      end
+    end
+
+    # Superclass of all errors that may be raised within the server
+    class ServerError < BaseError
+      # Longer-form description that may be present in the `data` field of
+      # the `Error` response object
+      attr_reader :description
 
       def data
         { 'description' => @description }
       end
     end
 
-    class InvalidRequestError < BaseError
+    class InvalidRequestError < ServerError
       def initialize(description)
         @description = description
 
