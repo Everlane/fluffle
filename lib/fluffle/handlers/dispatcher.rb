@@ -13,7 +13,7 @@ module Fluffle
         @routes << [pattern, block]
       end
 
-      def call(method:, params:)
+      def call(method:, params:,  **_)
         @routes.each do |(pattern, block)|
           next if pattern != method
 

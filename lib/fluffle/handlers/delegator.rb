@@ -5,7 +5,7 @@ module Fluffle
         @delegated_object = delegated_object
       end
 
-      def call(method:, params:)
+      def call(method:, params:,  **_)
         @delegated_object.send method.to_sym, *params
       end
     end
