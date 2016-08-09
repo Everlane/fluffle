@@ -5,7 +5,7 @@ require 'fluffle'
 
 server = Fluffle::Server.new url: 'amqp://localhost'
 
-server.drain 'default' do |dispatcher|
+server.drain do |dispatcher|
   dispatcher.handle('foo') { 'bar' }
 end
 

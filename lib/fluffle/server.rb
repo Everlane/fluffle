@@ -33,7 +33,7 @@ module Fluffle
 
       handler = Fluffle::Handlers::Dispatcher.new(&block) if block
 
-      @handlers[queue_name.to_s] = handler
+      @handlers[queue.to_s] = handler
     end
 
     def start
@@ -41,7 +41,7 @@ module Fluffle
       @exchange = @channel.default_exchange
 
       @handlers.each do |name, handler|
-        qualified_name = Fluffle.response_queue_name name
+        qualified_name = Fluffle.request_queue_name name
         queue          = @channel.queue qualified_name
 
         queue.subscribe do |delivery_info, properties, payload|
