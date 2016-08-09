@@ -1,9 +1,13 @@
-# [fluffle][]
+# fluffle
 
 An implementation of [JSON-RPC][] over RabbitMQ through the [Bunny][] library. Provides both a client and server.
 
+![](fluffle.jpg)
+
+> A group of baby bunnies is called a [fluffle][].
+
 [Bunny]: https://github.com/ruby-amqp/bunny
-[fluffle]: http://www.popsugar.com/smart-living/photo-gallery/35077705/image/35077754/Group-Bunnies-Called-Fluffle
+[fluffle]: http://imgur.com/6eABy1v
 [JSON-RPC]: http://www.jsonrpc.org/specification
 
 ## Features
