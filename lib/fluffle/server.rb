@@ -26,7 +26,7 @@ module Fluffle
       @connection&.connected?
     end
 
-    def drain(queue_name = 'default', handler: nil, &block)
+    def drain(queue: 'default', handler: nil, &block)
       if handler && block
         raise ArgumentError, 'Cannot provide both handler: and block'
       end
