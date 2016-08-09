@@ -61,7 +61,9 @@ module Fluffle
       reply_to = properties[:reply_to]
 
       begin
-        id, method, params = self.decode_and_verify payload
+        id, method, params = self.decode payload
+
+        raise Errors::InvalidRequestError.new("Missing `method' Request object member") unless method
 
         result = handler.call id: id,
                               method: method,
@@ -87,7 +89,7 @@ module Fluffle
 
     protected
 
-    def decode_and_verify(payload)
+    def decode(payload)
       payload = Oj.load payload
 
       id     = payload['id']
@@ -100,9 +102,12 @@ module Fluffle
     # Convert a Ruby error into a hash complying with the JSON-RPC spec
     # for `Error` response objects
     def build_error_response(err)
-      case err
-      when NoMethodError
+      if err.is_a? Errors::BaseError
+        err.to_response
+
+      elsif err.is_a? NoMethodError
         { 'code' => -32601, 'message' => 'Method not found' }
+
       else
         response = {
           'code' => 0,
