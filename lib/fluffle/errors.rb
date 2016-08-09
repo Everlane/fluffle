@@ -10,11 +10,14 @@ module Fluffle
       end
     end
 
+    class TimeoutError < StandardError
+    end
+
     # Raise this within your own code to get an error that will be faithfully
     # translated into the code, message, and data member fields of the
     # spec's `Error` response object
     class CustomError < BaseError
-      attr_accessor :data
+      attr_accessor :code, :data
 
       def initialize(code: 0, message:, data: nil)
         @code = code

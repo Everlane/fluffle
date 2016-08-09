@@ -9,7 +9,11 @@ module Fluffle
   class Client
     include Connectable
 
+    attr_accessor :default_timeout
+
     def initialize(url:)
+      @default_timeout = 5
+
       self.connect url
 
       @uuid        = UUIDTools::UUID.timestamp_create.to_s
@@ -27,20 +31,24 @@ module Fluffle
 
     def subscribe
       @reply_queue.subscribe do |delivery_info, properties, payload|
-        self.handle_resposne delivery_info: delivery_info,
+        self.handle_response delivery_info: delivery_info,
                              properties: properties,
                              payload: payload
       end
     end
 
-    def handle_resposne(delivery_info:, properties:, payload:)
-      payload  = Oj.load payload
+    def handle_response(delivery_info:, properties:, payload:)
+      payload = Oj.load payload
 
       ivar = @pending_responses.delete payload['id']
       ivar.set payload
     end
 
-    def call(method, params = [], queue: 'default')
+    def call(method, params = [], queue: 'default', **opts)
+      # Using `.fetch` here so that we can pass `nil` as the timeout and have
+      # it be respected
+      timeout = opts.fetch :timeout, self.default_timeout
+
       id = random_bytes_as_hex 8
 
       payload = {
@@ -50,19 +58,27 @@ module Fluffle
         'params'  => params
       }
 
+      ivar = Concurrent::IVar.new
+      @pending_responses[id] = ivar
+
       @exchange.publish Oj.dump(payload), routing_key: Fluffle.request_queue_name(queue),
                                           correlation_id: id,
                                           reply_to: @reply_queue.name
 
-      ivar = Concurrent::IVar.new
-      @pending_responses[id] = ivar
+      response = ivar.value timeout
 
-      response = ivar.value
+      if ivar.incomplete?
+        raise Errors::TimeoutError.new("Timed out waiting for response to `#{method}/#{params.length}'")
+      end
 
       if response['result']
         response['result']
       else
-        raise # TODO: Raise known error subclass to be caught by client code
+        error = response['error'] || {}
+
+        raise Errors::CustomError.new code: error['code'] || 0,
+                                      message: error['message'] || "Missing both `result' and `error' on Response object",
+                                      data: error['data']
       end
     end
 
