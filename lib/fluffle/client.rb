@@ -17,6 +17,9 @@ module Fluffle
       @exchange    = @channel.default_exchange
       @reply_queue = @channel.queue Fluffle.response_queue_name(@uuid), exclusive: true
 
+      # Used for generating unique message IDs
+      @prng = Random.new
+
       @pending_responses = Concurrent::Map.new
 
       self.subscribe
@@ -38,7 +41,7 @@ module Fluffle
     end
 
     def call(method, params = [], queue: 'default')
-      id = SecureRandom.hex 8
+      id = random_bytes_as_hex 8
 
       payload = {
         'jsonrpc' => '2.0',
@@ -61,6 +64,13 @@ module Fluffle
       else
         raise # TODO: Raise known error subclass to be caught by client code
       end
+    end
+
+    protected
+
+    def random_bytes_as_hex(bytes)
+      # Adapted from `SecureRandom.hex`
+      @prng.bytes(bytes).unpack('H*')[0]
     end
   end
 end
