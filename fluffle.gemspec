@@ -12,7 +12,7 @@ Gem::Specification.new do |s|
   s.homepage = 'https://github.com/Everlane/fluffle'
   s.license  = 'MIT'
 
-  s.required_ruby_version = '>= 1.9.3'
+  s.required_ruby_version = '>= 2.0'
 
   s.add_dependency 'bunny',           '~> 2.5.0'
   s.add_dependency 'concurrent-ruby', '~> 1.0.2'
