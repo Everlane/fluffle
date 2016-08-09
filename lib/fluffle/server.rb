@@ -57,27 +57,62 @@ module Fluffle
     end
 
     def handle_request(queue_name:, handler:, delivery_info:, properties:, payload:)
+      id       = nil
       reply_to = properties[:reply_to]
-      payload  = Oj.load payload
+
+      begin
+        id, method, params = self.decode_and_verify payload
+
+        result = handler.call id: id,
+                              method: method,
+                              params: params,
+                              meta: {
+                                reply_to: reply_to
+                              }
+      rescue => err
+        error = self.build_error_response err
+      end
+
+      response = { 'jsonrpc' => '2.0', 'id' => id }
+
+      if error
+        response['error'] = error
+      else
+        response['result'] = result
+      end
+
+      @exchange.publish Oj.dump(response), routing_key: reply_to,
+                                           correlation_id: id
+    end
+
+    protected
+
+    def decode_and_verify(payload)
+      payload = Oj.load payload
 
       id     = payload['id']
       method = payload['method']
       params = payload['params']
 
-      # TODO: Error handling!
-      result = handler.call id: id,
-                            method: method,
-                            params: params,
-                            meta: {
-                              reply_to: reply_to
-                            }
+      [id, method, params]
+    end
 
-      payload = { 'jsonrpc' => '2.0', 'id' => id }
+    # Convert a Ruby error into a hash complying with the JSON-RPC spec
+    # for `Error` response objects
+    def build_error_response(err)
+      case err
+      when NoMethodError
+        { 'code' => -32601, 'message' => 'Method not found' }
+      else
+        response = {
+          'code' => 0,
+          'message' => err.message
+        }
 
-      payload['result'] = result
+        response['data'] = err.data if err.respond_to? :data
 
-      @exchange.publish Oj.dump(payload), routing_key: reply_to,
-                                          correlation_id: id
+        response
+      end
     end
   end
 end
