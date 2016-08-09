@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.version  = Fluffle::VERSION
   s.authors  = ['Dirk Gadsden']
   s.email    = ['dirk@esherido.com']
-  s.summary  = ''
+  s.summary  = 'Client and server implementations for JSON-RPC over RabbitMQ'
   s.homepage = 'https://github.com/Everlane/fluffle'
   s.license  = 'MIT'
 
