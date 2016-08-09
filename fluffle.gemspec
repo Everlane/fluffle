@@ -19,8 +19,9 @@ Gem::Specification.new do |s|
   s.add_dependency 'oj',              '~> 2.17.1'
   s.add_dependency 'uuidtools',       '~> 2.1.5'
 
-  s.add_development_dependency 'rspec', '~> 3.4.0'
   s.add_development_dependency 'pry',   '~> 0.10.1'
+  s.add_development_dependency 'rake',  '~> 11.2.2'
+  s.add_development_dependency 'rspec', '~> 3.4.0'
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- test/*`.split("\n")
