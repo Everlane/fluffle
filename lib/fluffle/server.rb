@@ -1,8 +1,6 @@
 module Fluffle
   class Server
-    class << self
-      attr_accessor :default_server
-    end
+    include Connectable
 
     attr_reader :connection, :handlers
 
@@ -15,15 +13,8 @@ module Fluffle
       self.class.default_server ||= self
     end
 
-    def connect(*args)
-      self.stop if self.connected?
-
-      @connection = Bunny.new *args
-      @connection.start
-    end
-
-    def connected?
-      @connection&.connected?
+    class << self
+      attr_accessor :default_server
     end
 
     def drain(queue: 'default', handler: nil, &block)
