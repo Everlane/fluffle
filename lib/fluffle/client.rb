@@ -83,16 +83,22 @@ module Fluffle
       end
     end
 
-    protected
-
     # Publish a payload to the server and wait (block) for the response
     #
-    # Returns a Hash from the parsed JSON response from the server
+    # It creates an `IVar` future for the response, stores that in
+    # `@pending_responses`, and then publishes the payload to the server.
+    # After publishing it waits for the `IVar` to be set with the response.
+    # It also clears that `IVar` if it times out to avoid leaking.
+    #
+    # Returns a Hash from the JSON response from the server
     # Raises TimeoutError if server failed to respond in time
     def publish_and_wait(payload, queue:, timeout:)
       id = payload['id']
 
-      ivar = self.publish payload, queue: queue
+      ivar = Concurrent::IVar.new
+      @pending_responses[id] = ivar
+
+      self.publish payload, queue: queue
 
       response = ivar.value timeout
 
@@ -108,26 +114,17 @@ module Fluffle
       @pending_responses.delete id
     end
 
-    # Create an `IVar` future for the response, store that in
-    # `@pending_responses`, and finally publish the payload to the server
-    #
-    # Returns the `IVar`
     def publish(payload, queue:)
-      id = payload['id']
-
       opts = {
         routing_key: Fluffle.request_queue_name(queue),
-        correlation_id: id,
+        correlation_id: payload['id'],
         reply_to: @reply_queue.name
       }
 
-      ivar = Concurrent::IVar.new
-      @pending_responses[id] = ivar
-
       @exchange.publish Oj.dump(payload), opts
-
-      ivar
     end
+
+    protected
 
     def random_bytes_as_hex(bytes)
       # Adapted from `SecureRandom.hex`
