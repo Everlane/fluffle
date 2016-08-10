@@ -1,4 +1,5 @@
 require 'bunny'
+require 'logger'
 
 require 'fluffle/version'
 require 'fluffle/client'
@@ -16,5 +17,9 @@ module Fluffle
 
   def self.response_queue_name(name)
     "fluffle.responses.#{name}"
+  end
+
+  def self.logger
+    @logger ||= Logger.new $stdout
   end
 end

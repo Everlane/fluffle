@@ -10,9 +10,11 @@ module Fluffle
     include Connectable
 
     attr_accessor :default_timeout
+    attr_accessor :logger
 
     def initialize(url:)
       @default_timeout = 5
+      @logger          = Fluffle.logger
 
       self.connect url
 
@@ -39,9 +41,15 @@ module Fluffle
 
     def handle_response(delivery_info:, properties:, payload:)
       payload = Oj.load payload
+      id      = payload['id']
 
-      ivar = @pending_responses.delete payload['id']
-      ivar.set payload
+      ivar = @pending_responses.delete id
+
+      if ivar
+        ivar.set payload
+      else
+        self.logger.error "Missing pending response IVar: id=#{id || 'null'}"
+      end
     end
 
     def call(method, params = [], queue: 'default', **opts)
@@ -58,14 +66,24 @@ module Fluffle
         'params'  => params
       }
 
+      opts = {
+        routing_key: Fluffle.request_queue_name(queue),
+        correlation_id: id,
+        reply_to: @reply_queue.name
+      }
+
       ivar = Concurrent::IVar.new
-      @pending_responses[id] = ivar
 
-      @exchange.publish Oj.dump(payload), routing_key: Fluffle.request_queue_name(queue),
-                                          correlation_id: id,
-                                          reply_to: @reply_queue.name
+      begin
+        @pending_responses[id] = ivar
 
-      response = ivar.value timeout
+        @exchange.publish Oj.dump(payload), opts
+
+        response = ivar.value timeout
+      ensure
+        # Don't leak the `IVar` if it timed out
+        @pending_responses.delete id
+      end
 
       if ivar.incomplete?
         raise Errors::TimeoutError.new("Timed out waiting for response to `#{method}/#{params.length}'")
