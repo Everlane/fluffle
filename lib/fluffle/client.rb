@@ -33,13 +33,16 @@ module Fluffle
 
     def subscribe
       @reply_queue.subscribe do |delivery_info, properties, payload|
-        self.handle_response delivery_info: delivery_info,
-                             properties: properties,
-                             payload: payload
+        self.handle_reply delivery_info: delivery_info,
+                          properties: properties,
+                          payload: payload
       end
     end
 
-    def handle_response(delivery_info:, properties:, payload:)
+    # Fetch and set the `IVar` with a response from the server. This method is
+    # called from the reply queue's background thread; the main thread will
+    # normally be waiting for the `IVar` to be set.
+    def handle_reply(delivery_info:, properties:, payload:)
       payload = Oj.load payload
       id      = payload['id']
 
@@ -66,28 +69,8 @@ module Fluffle
         'params'  => params
       }
 
-      opts = {
-        routing_key: Fluffle.request_queue_name(queue),
-        correlation_id: id,
-        reply_to: @reply_queue.name
-      }
-
-      ivar = Concurrent::IVar.new
-
-      begin
-        @pending_responses[id] = ivar
-
-        @exchange.publish Oj.dump(payload), opts
-
-        response = ivar.value timeout
-      ensure
-        # Don't leak the `IVar` if it timed out
-        @pending_responses.delete id
-      end
-
-      if ivar.incomplete?
-        raise Errors::TimeoutError.new("Timed out waiting for response to `#{method}/#{params.length}'")
-      end
+      response = publish_and_wait payload, queue: queue,
+                                           timeout: timeout
 
       if response['result']
         response['result']
@@ -101,6 +84,50 @@ module Fluffle
     end
 
     protected
+
+    # Publish a payload to the server and wait (block) for the response
+    #
+    # Returns a Hash from the parsed JSON response from the server
+    # Raises TimeoutError if server failed to respond in time
+    def publish_and_wait(payload, queue:, timeout:)
+      id = payload['id']
+
+      ivar = self.publish payload, queue: queue
+
+      response = ivar.value timeout
+
+      if ivar.incomplete?
+        method = payload['method']
+        arity  = payload['params']&.length || 0
+        raise Errors::TimeoutError.new("Timed out waiting for response to `#{method}/#{arity}'")
+      end
+
+      return response
+    ensure
+      # Don't leak the `IVar` if it timed out
+      @pending_responses.delete id
+    end
+
+    # Create an `IVar` future for the response, store that in
+    # `@pending_responses`, and finally publish the payload to the server
+    #
+    # Returns the `IVar`
+    def publish(payload, queue:)
+      id = payload['id']
+
+      opts = {
+        routing_key: Fluffle.request_queue_name(queue),
+        correlation_id: id,
+        reply_to: @reply_queue.name
+      }
+
+      ivar = Concurrent::IVar.new
+      @pending_responses[id] = ivar
+
+      @exchange.publish Oj.dump(payload), opts
+
+      ivar
+    end
 
     def random_bytes_as_hex(bytes)
       # Adapted from `SecureRandom.hex`

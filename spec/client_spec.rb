@@ -18,9 +18,9 @@ describe Fluffle::Client do
       ->(id) do
         response_payload = { 'jsonrpc' => '2.0', 'id' => id }.merge(payload)
 
-        subject.handle_response delivery_info: double('DeliveryInfo'),
-                                properties: double('Properties'),
-                                payload: Oj.dump(response_payload)
+        subject.handle_reply delivery_info: double('DeliveryInfo'),
+                             properties: double('Properties'),
+                             payload: Oj.dump(response_payload)
       end
     end
 
