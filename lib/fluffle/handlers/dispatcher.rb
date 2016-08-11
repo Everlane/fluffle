@@ -1,5 +1,17 @@
 module Fluffle
   module Handlers
+    # Lightweight DSL for defining handler blocks for a given message
+    #
+    # Examples
+    #
+    #   dispatcher = Fluffle::Handlers::Dispatcher.new
+    #   dispatcher.handle('upcase') { |str| str.upcase }
+    #
+    #   # Also exposed through the `Fluffle::Server#drain` method
+    #   server.drain do |dispatcher|
+    #     dispatcher.handle('upcase') { |str| str.upcase }
+    #   end
+    #
     class Dispatcher < Base
       def initialize
         @routes = []
