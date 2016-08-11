@@ -62,9 +62,7 @@ module Fluffle
         end
 
         subscribers.each do |subscriber|
-          Thread.new do
-            subscriber.call(delivery_info, properties, payload)
-          end
+          subscriber.call(delivery_info, properties, payload)
         end
       end
 
