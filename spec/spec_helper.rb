@@ -2,4 +2,4 @@ require 'bundler/setup'
 
 require 'fluffle'
 
-Fluffle.logger.level = :fatal
+Fluffle.logger.level = Logger::Severity::FATAL
