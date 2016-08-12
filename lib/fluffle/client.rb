@@ -104,7 +104,7 @@ module Fluffle
 
       if ivar.incomplete?
         method = payload['method']
-        arity  = payload['params']&.length || 0
+        arity  = (payload['params'] && payload['params'].length) || 0
         raise Errors::TimeoutError.new("Timed out waiting for response to `#{method}/#{arity}'")
       end
 
