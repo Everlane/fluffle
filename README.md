@@ -1,5 +1,7 @@
 # fluffle
 
+[![Build Status](https://travis-ci.org/Everlane/fluffle.svg?branch=master)](https://travis-ci.org/Everlane/fluffle)
+
 An implementation of [JSON-RPC][] over RabbitMQ through the [Bunny][] library. Provides both a client and server.
 
 ![](fluffle.jpg)
