@@ -63,6 +63,8 @@ module Fluffle
                                 reply_to: reply_to
                               }
       rescue => err
+        log_error(err) if Fluffle.logger.error?
+
         error = self.build_error_response err
       end
 
@@ -95,6 +97,23 @@ module Fluffle
       raise Errors::InvalidRequestError.new("Missing `method' Request object member") unless request[:method]
     end
 
+    # Logs a nicely-formmated error to `Fluffle.logger` with the class,
+    # message, and backtrace (if available)
+    def log_error(err)
+      backtrace = Array(err.backtrace).flatten.compact
+
+      backtrace =
+        if backtrace.empty?
+          ''
+        else
+          prefix = "\n  "
+          prefix + backtrace.join(prefix)
+        end
+
+      message = "#{err.class}: #{err.message}#{backtrace}"
+      Fluffle.logger.error message
+    end
+
     # Convert a Ruby error into a hash complying with the JSON-RPC spec
     # for `Error` response objects
     def build_error_response(err)
@@ -107,7 +126,7 @@ module Fluffle
       else
         response = {
           'code' => 0,
-          'message' => err.message
+          'message' => "#{err.class}: #{err.message}"
         }
 
         response['data'] = err.data if err.respond_to? :data
