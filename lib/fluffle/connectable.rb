@@ -14,7 +14,7 @@ module Fluffle
     end
 
     def connected?
-      @connection&.connected?
+      @connection && @connection.connected?
     end
   end
 end
