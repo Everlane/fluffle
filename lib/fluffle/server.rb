@@ -44,7 +44,23 @@ module Fluffle
         end
       end
 
-      @channel.work_pool.join
+      # Ensure the work pool is running and ready to handle requests
+      @channel.work_pool.start
+
+      received_signal = nil
+      %w[INT TERM USR1 USR2].each do |signal|
+        Signal.trap(signal) { received_signal = signal }
+      end
+
+      loop do
+        if received_signal
+          Fluffle.logger.info "Received #{received_signal}; shutting down..."
+          @channel.work_pool.shutdown
+          break
+        else
+          sleep 1
+        end
+      end
     end
 
     def handle_request(queue_name:, handler:, delivery_info:, properties:, payload:)
