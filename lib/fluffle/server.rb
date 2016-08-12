@@ -47,19 +47,24 @@ module Fluffle
       # Ensure the work pool is running and ready to handle requests
       @channel.work_pool.start
 
-      received_signal = nil
-      %w[INT TERM USR1 USR2].each do |signal|
-        Signal.trap(signal) { received_signal = signal }
+      signal_read, signal_write = IO.pipe
+
+      %w[INT TERM].each do |signal|
+        Signal.trap(signal) do
+          signal_write.puts signal
+        end
       end
 
-      loop do
-        if received_signal
-          Fluffle.logger.info "Received #{received_signal}; shutting down..."
-          @channel.work_pool.shutdown
-          break
-        else
-          sleep 1
-        end
+      # Adapted from Sidekiq:
+      #   https://github.com/mperham/sidekiq/blob/e634177/lib/sidekiq/cli.rb#L94-L97
+      while io = IO.select([signal_read])
+        readables = io.first
+        signal    = readables.first.gets.strip
+
+        Fluffle.logger.info "Received #{signal}; shutting down..."
+        @channel.work_pool.shutdown
+
+        return
       end
     end
 
