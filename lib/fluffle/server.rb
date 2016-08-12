@@ -2,13 +2,15 @@ module Fluffle
   class Server
     include Connectable
 
-    attr_reader :connection, :handlers
+    attr_reader :connection, :handlers, :handler_pool
 
-    def initialize(url: nil)
+    # url:         - Optional URL to pass to `Bunny.new` to immediately connect
+    # concurrency: - Number of threads to handle messages on (default: 1)
+    def initialize(url: nil, concurrency: 1)
       self.connect(url) if url
 
-      @handlers = {}
-      @queues   = {}
+      @handlers     = {}
+      @handler_pool = Concurrent::FixedThreadPool.new concurrency
 
       self.class.default_server ||= self
     end
@@ -31,21 +33,20 @@ module Fluffle
       @channel  = @connection.create_channel
       @exchange = @channel.default_exchange
 
+      raise 'No handlers defined' if @handlers.empty?
+
       @handlers.each do |name, handler|
         qualified_name = Fluffle.request_queue_name name
         queue          = @channel.queue qualified_name
 
-        queue.subscribe do |delivery_info, properties, payload|
-          self.handle_request queue_name: name,
-                              handler: handler,
-                              delivery_info: delivery_info,
-                              properties: properties,
-                              payload: payload
+        queue.subscribe do |_delivery_info, properties, payload|
+          @handler_pool.post do
+            self.handle_request handler: handler,
+                                properties: properties,
+                                payload: payload
+          end
         end
       end
-
-      # Ensure the work pool is running and ready to handle requests
-      @channel.work_pool.start
 
       signal_read, signal_write = IO.pipe
 
@@ -68,21 +69,57 @@ module Fluffle
       end
     end
 
-    def handle_request(queue_name:, handler:, delivery_info:, properties:, payload:)
-      id       = nil
+    def handle_request(handler:, properties:, payload:)
       reply_to = properties[:reply_to]
 
-      begin
-        id, method, params = self.decode payload
+      responses = []
 
-        validate_request method: method
+      begin
+        decoded = self.decode payload
+
+        requests =
+          if decoded.is_a? Hash
+            [ decoded ] # Single request
+          elsif decoded.is_a? Array
+            decoded # Batch request
+          else
+            raise Errors::InvalidRequestError.new('Payload was neither an Array nor an Object')
+          end
+
+        requests.each do |request|
+          response = self.call_handler handler: handler,
+                                       request: request
+
+          responses << response
+        end
+      rescue => err
+        responses << {
+          'jsonrpc' => '2.0',
+          'id'      => nil,
+          'error'   => self.build_error_response(err)
+        }
+      end
+
+      responses.each do |response|
+        @exchange.publish Oj.dump(response), routing_key: reply_to,
+                                             correlation_id: response['id']
+      end
+    end
+
+    # handler - Instance of a `Handler` that may receive `#call`
+    # request - `Hash` representing a decoded Request
+    def call_handler(handler:, request:)
+      begin
+        # We don't yet know if it's valid, so we have to be as cautious as
+        # possible about getting the ID
+        id = begin request['id']; rescue; nil end
+
+        self.validate_request request
 
         result = handler.call id: id,
-                              method: method,
-                              params: params,
-                              meta: {
-                                reply_to: reply_to
-                              }
+                              method: request['method'],
+                              params: request['params'],
+                              meta: {}
       rescue => err
         log_error(err) if Fluffle.logger.error?
 
@@ -97,26 +134,27 @@ module Fluffle
         response['result'] = result
       end
 
-      @exchange.publish Oj.dump(response), routing_key: reply_to,
-                                           correlation_id: id
+      response
+    end
+
+    # Deserialize a JSON payload and extract its 3 members: id, method, params
+    #
+    # payload - `String` of the payload from the queue
+    #
+    # Returns a `Hash` from parsing the JSON payload (keys should be `String`)
+    def decode(payload)
+      Oj.load payload
+    end
+
+    # Raises if elements of the request payload do not comply with the spec
+    #
+    # payload - Decoded `Hash` of the payload (`String` keys)
+    def validate_request(request)
+      raise Errors::InvalidRequestError.new("Improperly formatted Request (expected `Hash', got `#{request.class}')") unless request && request.is_a?(Hash)
+      raise Errors::InvalidRequestError.new("Missing `method' Request object member") unless request['method']
     end
 
     protected
-
-    def decode(payload)
-      payload = Oj.load payload
-
-      id     = payload['id']
-      method = payload['method']
-      params = payload['params']
-
-      [id, method, params]
-    end
-
-    # Raises if elements of the request do not comply with the spec
-    def validate_request(request)
-      raise Errors::InvalidRequestError.new("Missing `method' Request object member") unless request[:method]
-    end
 
     # Logs a nicely-formmated error to `Fluffle.logger` with the class,
     # message, and backtrace (if available)
