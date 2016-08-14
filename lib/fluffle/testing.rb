@@ -2,6 +2,20 @@ require 'concurrent'
 
 module Fluffle
   module Testing
+    def self.setup!
+      # Inject our own custom `Connectable` implementation
+      [Fluffle::Client, Fluffle::Server].each do |mod|
+        mod.include Connectable
+      end
+
+      Fluffle::Server.class_eval do
+        # Overwriting this so that we don't actually block waiting for signal
+        def wait_for_signal
+          # pass
+        end
+      end
+    end
+
     # Patch in a new `#connect` method that injects the loopback
     module Connectable
       def self.included(klass)
@@ -12,12 +26,6 @@ module Fluffle
             @connection = Loopback.instance.connection
           end
         end
-      end
-    end
-
-    def self.inject_connectable
-      [Fluffle::Client, Fluffle::Server].each do |mod|
-        mod.include Connectable
       end
     end
 
@@ -119,14 +127,8 @@ module Fluffle
         end
       end
 
-      class WorkPool
-        # No-op in testing
-        def join
-        end
-      end
-
     end # class LoopbackServer
   end # module Testing
 end # module Fluffle
 
-Fluffle::Testing.inject_connectable
+Fluffle::Testing.setup!

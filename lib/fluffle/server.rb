@@ -48,6 +48,12 @@ module Fluffle
         end
       end
 
+      self.wait_for_signal
+    end
+
+    # NOTE: Keeping this in its own method so its functionality can be more
+    #   easily overwritten by `Fluffle::Testing`.
+    def wait_for_signal
       signal_read, signal_write = IO.pipe
 
       %w[INT TERM].each do |signal|
