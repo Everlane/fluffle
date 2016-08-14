@@ -90,8 +90,9 @@ module Fluffle
     # After publishing it waits for the `IVar` to be set with the response.
     # It also clears that `IVar` if it times out to avoid leaking.
     #
-    # Returns a Hash from the JSON response from the server
-    # Raises TimeoutError if server failed to respond in time
+    # Returns a `Hash` from the JSON response from the server
+    # Raises `Fluffle::Errors::TimeoutError` if the server failed to respond
+    #   within the given time in `timeout:`
     def publish_and_wait(payload, queue:, timeout:)
       id = payload['id']
 
