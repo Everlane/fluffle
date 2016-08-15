@@ -3,7 +3,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'fluffle'
 
-server = Fluffle::Server.new url: 'amqp://localhost'
+server = Fluffle::Server.new url: 'amqp://localhost', concurrency: 5
 
 server.drain do |dispatcher|
   dispatcher.handle('foo') { 'bar' }
