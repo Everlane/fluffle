@@ -6,8 +6,9 @@ module Fluffle
 
     # url:         - Optional URL to pass to `Bunny.new` to immediately connect
     # concurrency: - Number of threads to handle messages on (default: 1)
-    def initialize(url: nil, concurrency: 1)
-      self.connect(url) if url
+    def initialize(url: nil, connection: nil, concurrency: 1)
+      url_or_connection = url || connection
+      self.connect(url_or_connection) if url_or_connection
 
       @handlers     = {}
       @handler_pool = Concurrent::FixedThreadPool.new concurrency

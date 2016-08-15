@@ -9,7 +9,13 @@ module Fluffle
     def connect(*args)
       self.stop if self.connected?
 
-      @connection = Bunny.new *args
+      @connection =
+        if args.first.is_a? Bunny::Session
+          args.first
+        else
+          Bunny.new *args
+        end
+
       @connection.start
     end
 

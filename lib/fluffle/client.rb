@@ -12,11 +12,11 @@ module Fluffle
     attr_accessor :default_timeout
     attr_accessor :logger
 
-    def initialize(url:)
+    def initialize(url: nil, connection: nil)
+      self.connect(url || connection)
+
       @default_timeout = 5
       @logger          = Fluffle.logger
-
-      self.connect url
 
       @uuid        = UUIDTools::UUID.timestamp_create.to_s
       @channel     = @connection.create_channel

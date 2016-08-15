@@ -13,6 +13,33 @@ describe Fluffle::Client do
     end
   end
 
+  describe '#initialize' do
+    it 'allows user to pass an `amqp://` URL via `url:`' do
+      client = Fluffle::Client.new url: 'amqp://localhost'
+
+      expect(client.connection).to be_a Bunny::Session
+      expect(client.connected?).to eq true
+    end
+
+    it 'allows user to provide existing Bunny connection via `connection:`' do
+      bunny_channel = double 'Bunny::Channel',
+        default_exchange: double('Bunny::Exchange'),
+        queue: double('Bunny::Queue', subscribe: nil)
+
+      bunny_session = double 'Bunny::Session',
+        create_channel: bunny_channel,
+        start: nil,
+        connected?: true
+
+      allow(bunny_session).to receive(:is_a?).with(Bunny::Session).and_return(true)
+
+      client = Fluffle::Client.new connection: bunny_session
+
+      expect(client.connection).to eq bunny_session
+      expect(client.connected?).to eq true
+    end
+  end
+
   describe '#call' do
     def prepare_response(payload)
       ->(id) do
