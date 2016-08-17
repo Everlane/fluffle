@@ -2,29 +2,35 @@ require 'concurrent'
 
 module Fluffle
   module Testing
-    def self.setup!
-      # Inject our own custom `Connectable` implementation
-      [Fluffle::Client, Fluffle::Server].each do |mod|
-        mod.include Connectable
-      end
-
-      Fluffle::Server.class_eval do
-        # Overwriting this so that we don't actually block waiting for signal
-        def wait_for_signal
-          # pass
+    class << self
+      def setup!(use_fake_thread_pool: true)
+        # Inject our own custom `Connectable` implementation
+        [Fluffle::Client, Fluffle::Server].each do |mod|
+          mod.include Connectable
         end
 
-        # Wrap the `initialize` implementation to switch out the handler pool
-        # to a local unthreaded one
-        alias_method :original_initialize, :initialize
+        Fluffle::Server.class_eval do
+          # Overwriting this so that we don't actually block waiting for signal
+          def wait_for_signal
+            # pass
+          end
+        end
 
-        def initialize(*args)
-          original_initialize *args
+        if use_fake_thread_pool
+          Fluffle::Server.class_eval do
+            # Wrap the `initialize` implementation to switch out the handler pool
+            # to a local unthreaded one
+            alias_method :original_initialize, :initialize
 
-          @handler_pool = ThreadPool.new
+            def initialize(*args)
+              original_initialize *args
+
+              @handler_pool = ThreadPool.new
+            end
+          end
         end
       end
-    end
+    end # class << self
 
     # Patch in a new `#connect` method that injects the loopback
     module Connectable
