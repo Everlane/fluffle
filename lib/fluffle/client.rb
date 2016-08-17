@@ -72,7 +72,7 @@ module Fluffle
       response = publish_and_wait payload, queue: queue,
                                            timeout: timeout
 
-      if response['result']
+      if response.key? 'result'
         response['result']
       else
         error = response['error'] || {}

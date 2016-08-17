@@ -71,6 +71,16 @@ describe Fluffle::Client do
       expect(subject.call(method)).to eq(result)
     end
 
+    it 'accepts null as a result' do
+      respond = prepare_response 'result' => nil
+
+      allow(@exchange_spy).to receive(:publish) do |payload, _opts|
+        respond.call Oj.load(payload)['id']
+      end
+
+      expect(subject.call('something')).to eq(nil)
+    end
+
     it 'raises on error from server' do
       code    = 1337
       message = 'Uh-oh!'
