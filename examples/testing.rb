@@ -3,6 +3,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'fluffle'
 require 'fluffle/testing'
+Fluffle::Testing.setup!
 
 server = Fluffle::Server.new url: 'amqp://localhost'
 

@@ -148,5 +148,3 @@ module Fluffle
     end # class LoopbackServer
   end # module Testing
 end # module Fluffle
-
-Fluffle::Testing.setup!
