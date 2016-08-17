@@ -13,6 +13,16 @@ module Fluffle
         def wait_for_signal
           # pass
         end
+
+        # Wrap the `initialize` implementation to switch out the handler pool
+        # to a local unthreaded one
+        alias_method :original_initialize, :initialize
+
+        def initialize(*args)
+          original_initialize *args
+
+          @handler_pool = ThreadPool.new
+        end
       end
     end
 
@@ -26,6 +36,14 @@ module Fluffle
             @connection = Loopback.instance.connection
           end
         end
+      end
+    end
+
+    # Fake thread pool that executes `#post`'ed blocks immediately in the
+    # current thread
+    class ThreadPool
+      def post(&block)
+        block.call
       end
     end
 
