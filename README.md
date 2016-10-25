@@ -68,6 +68,28 @@ client.call 'upcase', ['Hello world!']
 # => "HELLO WORLD!"
 ```
 
+## Response meta-data
+
+The server adds an additional `meta` field to the response object with meta-data about how the request was handled. Currently the only entry in the `meta` object is the float `handler_duration` which is duration in seconds that was spent exclusively processing the handler.
+
+```javascript
+// Example successful response with meta-data (6ms spent in handler)
+{
+  "jsonrpc": "2.0",
+  "id": "123",
+  "result": "baz",
+  "meta": {"handler_duration": 0.006}
+}
+
+// Example error response with meta-data
+{
+  "jsonrpc": "2.0",
+  "id": "123",
+  "error": {"code": -32601, "message": "Method not found"},
+  "meta": {"handler_duration": 0.007}
+}
+```
+
 ## License
 
 Released under the MIT license, see [LICENSE](LICENSE) for details.
