@@ -79,47 +79,31 @@ module Fluffle
     def handle_request(handler:, properties:, payload:)
       reply_to = properties[:reply_to]
 
-      responses = []
+      id       = nil
+      response = nil
 
       begin
-        decoded = self.decode payload
+        request = self.decode payload
+        id      = request['id']
 
-        requests =
-          if decoded.is_a? Hash
-            [ decoded ] # Single request
-          elsif decoded.is_a? Array
-            decoded # Batch request
-          else
-            raise Errors::InvalidRequestError.new('Payload was neither an Array nor an Object')
-          end
-
-        requests.each do |request|
-          response = self.call_handler handler: handler,
-                                       request: request
-
-          responses << response
-        end
+        response = self.call_handler handler: handler, request: request
       rescue => err
-        responses << {
+        response = {
           'jsonrpc' => '2.0',
-          'id'      => nil,
+          'id'      => id,
           'error'   => self.build_error_response(err)
         }
       end
 
-      responses.each do |response|
-        @exchange.publish Oj.dump(response), routing_key: reply_to,
-                                             correlation_id: response['id']
-      end
+      @exchange.publish Oj.dump(response), routing_key: reply_to,
+                                           correlation_id: response['id']
     end
 
     # handler - Instance of a `Handler` that may receive `#call`
     # request - `Hash` representing a decoded Request
     def call_handler(handler:, request:)
       begin
-        # We don't yet know if it's valid, so we have to be as cautious as
-        # possible about getting the ID
-        id = begin request['id']; rescue; nil end
+        id = request['id']
 
         self.validate_request request
 

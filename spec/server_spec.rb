@@ -78,37 +78,6 @@ describe Fluffle::Server do
       expect_response payload: { 'result' => result }
     end
 
-    it 'responds with the correct individual results for a batch request' do
-      payload = [
-        { 'jsonrpc' => '2.0', 'id' => 'first',  'method' => 'multiply', 'params' => [1] },
-        { 'jsonrpc' => '2.0', 'id' => 'second', 'method' => 'multiply', 'params' => [2] }
-      ]
-
-      handler = double 'Handler'
-      expect(handler).to receive(:call).twice do |args|
-        expect(args).to include({
-          id: anything,
-          method: 'multiply'
-        })
-
-        args[:params].first * 2
-      end
-
-      responses = []
-
-      allow(@exchange_spy).to receive(:publish).ordered do |payload_json, _opts|
-        responses << Oj.load(payload_json)
-      end
-
-      subject.handle_request handler: handler,
-                             properties: { reply_to: reply_to },
-                             payload: Oj.dump(payload)
-
-      expect(responses.length).to eq 2
-      expect(responses[0]).to include('id' => 'first',  'result' => 2)
-      expect(responses[1]).to include('id' => 'second', 'result' => 4)
-    end
-
     it 'responds with the appropriate code and message when method not found' do
       @method = 'notfound'
 
