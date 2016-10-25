@@ -22,6 +22,10 @@ Both the client and server implementations should be thread-safe, as their behav
 
 [concurrent-ruby]: https://github.com/ruby-concurrency/concurrent-ruby
 
+**Note**: Fluffle uses JSON-RPC as a transfer format to structure requests and responses. However, due to some of the limitations imposed by AMQP, it cannot implement the complete set of behaviors in the JSON-RPC protocol. The most substantial of these limitations is that [batch requests][] are not supported.
+
+[batch requests]: http://www.jsonrpc.org/specification#batch
+
 ## Examples
 
 See the [`examples`](examples/) directory.
