@@ -49,7 +49,7 @@ describe Fluffle::Server do
       payload['id']      ||= id
 
       expect(@exchange_spy).to have_received(:publish) do |payload_json, opts|
-        expect(Oj.load(payload_json)).to eq payload
+        expect(Oj.load(payload_json)).to include payload
 
         expect(opts).to eq routing_key: routing_key,
                            correlation_id: correlation_id
@@ -109,6 +109,24 @@ describe Fluffle::Server do
                           'data' => { 'description' => "Missing `method' Request object member" }
                         }
                       }
+    end
+
+    it 'includes appropriate meta-data in the response' do
+      handler = double 'Handler'
+      expect(handler).to receive(:call) do |args|
+        sleep 0.01
+
+        'Hello world!'
+      end
+
+      make_request handler: handler
+
+      expect(@exchange_spy).to have_received(:publish) do |payload_json, opts|
+        payload = Oj.load payload_json
+        meta    = payload['meta']
+
+        expect(meta['handler_duration']).to be >= 0.01
+      end
     end
   end
 end

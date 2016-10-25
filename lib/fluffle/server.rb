@@ -102,6 +102,8 @@ module Fluffle
     # handler - Instance of a `Handler` that may receive `#call`
     # request - `Hash` representing a decoded Request
     def call_handler(handler:, request:)
+      t0 = Time.now
+
       begin
         id = request['id']
 
@@ -117,7 +119,13 @@ module Fluffle
         error = self.build_error_response err
       end
 
-      response = { 'jsonrpc' => '2.0', 'id' => id }
+      response = {
+        'jsonrpc' => '2.0',
+        'id'      => id,
+        'meta'    => {
+          'handler_duration' => (Time.now - t0)
+        }
+      }
 
       if error
         response['error'] = error
