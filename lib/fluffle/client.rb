@@ -83,7 +83,7 @@ module Fluffle
       end
     end
 
-    def call(method, params = [], queue: 'default', **opts)
+    def call(method, params = [], queue: 'default', raw_response: false, **opts)
       # Using `.fetch` here so that we can pass `nil` as the timeout and have
       # it be respected
       timeout = opts.fetch :timeout, self.default_timeout
@@ -99,6 +99,8 @@ module Fluffle
 
       response = publish_and_wait payload, queue: queue,
                                            timeout: timeout
+
+      return response if raw_response
 
       if response.key? 'result'
         response['result']
