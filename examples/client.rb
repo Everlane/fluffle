@@ -3,7 +3,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'fluffle'
 
-client = Fluffle::Client.new url: 'amqp://localhost'
+client = Fluffle::Client.new url: 'amqp://localhost', confirms: true
 # You can also pass `connection:` to use an existing Bunny connection:
 #   Fluffle::Client.new(connection: Bunny.new('amqp://localhost', heartbeat: 2))
 

@@ -9,12 +9,14 @@ module Fluffle
   class Client
     include Connectable
 
+    attr_reader :confirms
     attr_accessor :default_timeout
     attr_accessor :logger
 
-    def initialize(url: nil, connection: nil)
+    def initialize(url: nil, connection: nil, confirms: false)
       self.connect(url || connection)
 
+      @confirms        = confirms
       @default_timeout = 5
       @logger          = Fluffle.logger
 
@@ -26,9 +28,13 @@ module Fluffle
       # Used for generating unique message IDs
       @prng = Random.new
 
-      @pending_responses = Concurrent::Map.new
+      if confirms
+        @pending_confirms = Concurrent::Map.new
+        confirm_select
+      end
 
-      self.subscribe
+      @pending_responses = Concurrent::Map.new
+      subscribe
     end
 
     def subscribe
@@ -43,6 +49,22 @@ module Fluffle
           Fluffle.logger.error "#{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
         end
       end
+    end
+
+    def confirm_select
+      handle_confirm = ->(tag, _multiple, nack) do
+        ivar = @pending_confirms.delete tag
+
+        if ivar
+          ivar.set nack
+        else
+          self.logger.error "Missing confirm IVar: tag=#{tag}"
+        end
+      end
+
+      # Set the channel in confirmation mode so that we can receive confirms
+      # of published messages
+      @channel.confirm_select handle_confirm
     end
 
     # Fetch and set the `IVar` with a response from the server. This method is
@@ -102,23 +124,55 @@ module Fluffle
     def publish_and_wait(payload, queue:, timeout:)
       id = payload['id']
 
-      ivar = Concurrent::IVar.new
-      @pending_responses[id] = ivar
+      response_ivar = Concurrent::IVar.new
+      @pending_responses[id] = response_ivar
 
-      self.publish payload, queue: queue
-
-      response = ivar.value timeout
-
-      if ivar.incomplete?
-        method = payload['method']
-        arity  = (payload['params'] && payload['params'].length) || 0
-        raise Errors::TimeoutError.new("Timed out waiting for response to `#{method}/#{arity}'")
+      if confirms
+        with_confirmation(timeout: timeout) { publish payload, queue: queue }
+      else
+        publish payload, queue: queue
       end
+
+      response = response_ivar.value timeout
+      raise_incomplete(payload, 'response') if response_ivar.incomplete?
 
       return response
     ensure
       # Don't leak the `IVar` if it timed out
       @pending_responses.delete id
+    end
+
+    # Returns a nice formatted description of a payload with its method name
+    #   and arity
+    def describe_payload(payload)
+      method = payload['method']
+      arity  = (payload['params'] && payload['params'].length) || 0
+
+      "#{method}/#{arity}"
+    end
+
+    # Wraps a block (which should publish a message) with a blocking check
+    #   that the client received a confirmation from the RabbitMQ server
+    #   that the message that was received and routed successfully
+    def with_confirmation(timeout:)
+      tag = @channel.next_publish_seq_no
+      confirm_ivar = Concurrent::IVar.new
+      @pending_confirms[tag] = confirm_ivar
+
+      yield
+
+      nack = confirm_ivar.value timeout
+      if confirm_ivar.incomplete?
+        raise_incomplete payload, 'confirm'
+      elsif nack
+        raise Errors::NackError.new('Received nack from confirmation')
+      end
+    end
+
+    # event_name - String describing what we timed out waiting for, should
+    #   be 'response' or 'confirm'
+    def raise_incomplete(payload, event_name)
+      raise Errors::TimeoutError.new("Timed out waiting for #{event_name} to `#{describe_payload(payload)}'")
     end
 
     def publish(payload, queue:)
