@@ -13,7 +13,7 @@ end
 
 server.start
 
-client = Fluffle::Client.new url: 'amqp://localhost'
+client = Fluffle::Client.new url: 'amqp://localhost', confirms: true
 
 timings = 10.times.map do
   t0 = Time.now

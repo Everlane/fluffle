@@ -61,6 +61,8 @@ module Fluffle
         @instance ||= self.new
       end
 
+      attr_accessor :next_publish_seq_no
+
       def initialize
         @queues = Concurrent::Map.new
       end
@@ -111,14 +113,26 @@ module Fluffle
       class Channel
         def initialize(server)
           @server = server
+
+          @confirm_select      = nil
+          @next_publish_seq_no = 0
         end
 
         def default_exchange
-          @default_exchange ||= Exchange.new(@server)
+          @default_exchange ||= Exchange.new(@server, self)
         end
 
         def work_pool
           @work_pool ||= WorkPool.new
+        end
+
+        def confirm_select(block = nil)
+          @confirm_select      = block
+          @next_publish_seq_no = 1
+        end
+
+        def next_publish_seq_no
+          @next_publish_seq_no
         end
 
         def queue(name, **opts)
@@ -126,15 +140,28 @@ module Fluffle
 
           Queue.new name, opts
         end
+
+        def publish(payload, opts)
+          if @confirm_select
+            multiple = false
+            nack = false
+            @confirm_select.call @next_publish_seq_no, multiple, nack
+          end
+
+          @server.publish payload, opts
+
+          @next_publish_seq_no += 1 if @next_publish_seq_no > 0
+        end
       end
 
       class Exchange
-        def initialize(server)
+        def initialize(server, channel)
           @server = server
+          @channel = channel
         end
 
         def publish(payload, opts)
-          @server.publish(payload, opts)
+          @channel.publish payload, opts
         end
       end
 
