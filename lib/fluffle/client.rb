@@ -33,9 +33,15 @@ module Fluffle
 
     def subscribe
       @reply_queue.subscribe do |delivery_info, properties, payload|
-        self.handle_reply delivery_info: delivery_info,
-                          properties: properties,
-                          payload: payload
+        begin
+          self.handle_reply delivery_info: delivery_info,
+                            properties: properties,
+                            payload: payload
+        rescue => err
+          # Bunny will let uncaptured errors silently wreck the reply thread,
+          # so we must be extra-careful about capturing them
+          Fluffle.logger.error "#{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
+        end
       end
     end
 
