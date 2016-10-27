@@ -14,7 +14,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = '>= 2.1'
 
-  s.add_dependency 'bunny',           '~> 2.5.0'
+  s.add_dependency 'bunny',           '~> 2.6.1'
   s.add_dependency 'concurrent-ruby', '~> 1.0.2'
   s.add_dependency 'oj',              '~> 2.17.1'
   s.add_dependency 'uuidtools',       '~> 2.1.5'
