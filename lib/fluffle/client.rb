@@ -46,7 +46,7 @@ module Fluffle
         rescue => err
           # Bunny will let uncaptured errors silently wreck the reply thread,
           # so we must be extra-careful about capturing them
-          Fluffle.logger.error "#{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
+          Fluffle.logger.error "[Fluffle::Client] #{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
         end
       end
     end

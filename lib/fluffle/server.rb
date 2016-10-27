@@ -42,9 +42,14 @@ module Fluffle
 
         queue.subscribe do |_delivery_info, properties, payload|
           @handler_pool.post do
-            self.handle_request handler: handler,
-                                properties: properties,
-                                payload: payload
+            begin
+              self.handle_request handler: handler,
+                                  properties: properties,
+                                  payload: payload
+            rescue => err
+              # Ensure we don't loose any errors on the handler pool's thread
+              Fluffle.logger.error "[Fluffle] #{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
+            end
           end
         end
       end
