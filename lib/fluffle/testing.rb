@@ -53,6 +53,8 @@ module Fluffle
       end
     end
 
+    DeliveryInfo = Struct.new(:delivery_tag)
+
     # Fake RabbitMQ server presented through a subset of the `Bunny`
     # library's interface
     class Loopback
@@ -60,8 +62,6 @@ module Fluffle
       def self.instance
         @instance ||= self.new
       end
-
-      attr_accessor :next_publish_seq_no
 
       def initialize
         @queues = Concurrent::Map.new
@@ -81,7 +81,7 @@ module Fluffle
         queue_name = opts[:routing_key]
         raise "Missing `:routing_key' in `#publish' opts" unless queue_name
 
-        delivery_info = nil
+        delivery_info = DeliveryInfo.new Random.rand(1000000)
 
         properties = {
           reply_to: opts[:reply_to],
