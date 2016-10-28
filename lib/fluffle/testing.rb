@@ -152,6 +152,10 @@ module Fluffle
 
           @next_publish_seq_no += 1 if @next_publish_seq_no > 0
         end
+
+        def ack(delivery_tag, multiple = false)
+          true
+        end
       end
 
       class Exchange
