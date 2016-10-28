@@ -40,15 +40,17 @@ module Fluffle
         qualified_name = Fluffle.request_queue_name name
         queue          = @channel.queue qualified_name
 
-        queue.subscribe do |_delivery_info, properties, payload|
+        queue.subscribe(manual_ack: true) do |delivery_info, properties, payload|
           @handler_pool.post do
             begin
-              self.handle_request handler: handler,
-                                  properties: properties,
-                                  payload: payload
+              @channel.ack delivery_info.delivery_tag
+
+              handle_request handler: handler,
+                             properties: properties,
+                             payload: payload
             rescue => err
               # Ensure we don't loose any errors on the handler pool's thread
-              Fluffle.logger.error "[Fluffle] #{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
+              Fluffle.logger.error "[Fluffle::Server] #{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
             end
           end
         end
