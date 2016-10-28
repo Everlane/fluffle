@@ -173,7 +173,7 @@ module Fluffle
           @server = server
         end
 
-        def subscribe(&block)
+        def subscribe(opts = {}, &block)
           @server.add_queue_subscriber @name, block
         end
       end
