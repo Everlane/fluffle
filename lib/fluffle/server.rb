@@ -1,14 +1,22 @@
+require 'concurrent'
+require 'oj'
+
 module Fluffle
   class Server
     include Connectable
 
-    attr_reader :connection, :handlers, :handler_pool
+    attr_reader :confirms, :connection, :handlers, :handler_pool
+    attr_accessor :publish_timeout
 
     # url:         - Optional URL to pass to `Bunny.new` to immediately connect
     # concurrency: - Number of threads to handle messages on (default: 1)
-    def initialize(url: nil, connection: nil, concurrency: 1)
+    # confirms:    - Whether or not to use RabbitMQ confirms
+    def initialize(url: nil, connection: nil, concurrency: 1, confirms: false)
       url_or_connection = url || connection
       self.connect(url_or_connection) if url_or_connection
+
+      @confirms        = confirms
+      @publish_timeout = 5
 
       @handlers     = {}
       @handler_pool = Concurrent::FixedThreadPool.new concurrency
@@ -38,6 +46,11 @@ module Fluffle
       @channel  = @connection.create_channel
       @exchange = @channel.default_exchange
 
+      if confirms
+        @pending_confirms = Concurrent::Map.new
+        confirm_select
+      end
+
       raise 'No handlers defined' if @handlers.empty?
 
       @handlers.each do |name, handler|
@@ -61,6 +74,21 @@ module Fluffle
       end
 
       self.wait_for_signal
+    end
+
+    def confirm_select
+      handle_confirm = ->(tag, _multiple, nack) do
+        ivar = @pending_confirms.delete tag
+
+        if ivar
+          ivar.set nack
+        else
+          self.logger.error "Missing confirm IVar: tag=#{tag}"
+        end
+      end
+
+      # Put the channel into confirmation
+      @channel.confirm_select handle_confirm
     end
 
     # NOTE: Keeping this in its own method so its functionality can be more
@@ -106,8 +134,16 @@ module Fluffle
         }
       end
 
-      @exchange.publish Oj.dump(response), routing_key: reply_to,
-                                           correlation_id: response['id']
+      publish = ->{
+        @exchange.publish Oj.dump(response), routing_key: reply_to,
+                                             correlation_id: response['id']
+      }
+
+      if confirms
+        with_confirmation timeout: publish_timeout, &publish
+      else
+        publish.()
+      end
     end
 
     # handler - Instance of a `Handler` that may receive `#call`
@@ -201,6 +237,24 @@ module Fluffle
         response['data'] = err.data if err.respond_to? :data
 
         response
+      end
+    end
+
+    # Wraps a block (which should publish a message) with a blocking check
+    #   that the client received a confirmation from the RabbitMQ server
+    #   that the message that was received and routed successfully
+    def with_confirmation(timeout:)
+      tag = @channel.next_publish_seq_no
+      confirm_ivar = Concurrent::IVar.new
+      @pending_confirms[tag] = confirm_ivar
+
+      yield
+
+      nack = confirm_ivar.value timeout
+      if confirm_ivar.incomplete?
+        raise Errors::TimeoutError.new('Timed out waiting for confirm')
+      elsif nack
+        raise Errors::NackError.new('Received nack from confirmation')
       end
     end
   end
