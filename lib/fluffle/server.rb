@@ -47,8 +47,8 @@ module Fluffle
       @exchange = @channel.default_exchange
 
       if confirms
-        @pending_confirms = Concurrent::Map.new
-        confirm_select
+        @confirmer = Fluffle::Confirmer.new channel: @channel
+        @confirmer.confirm_select
       end
 
       raise 'No handlers defined' if @handlers.empty?
@@ -74,21 +74,6 @@ module Fluffle
       end
 
       self.wait_for_signal
-    end
-
-    def confirm_select
-      handle_confirm = ->(tag, _multiple, nack) do
-        ivar = @pending_confirms.delete tag
-
-        if ivar
-          ivar.set nack
-        else
-          self.logger.error "Missing confirm IVar: tag=#{tag}"
-        end
-      end
-
-      # Put the channel into confirmation
-      @channel.confirm_select handle_confirm
     end
 
     # NOTE: Keeping this in its own method so its functionality can be more
@@ -140,7 +125,7 @@ module Fluffle
       }
 
       if confirms
-        with_confirmation timeout: publish_timeout, &publish
+        @confirmer.with_confirmation timeout: publish_timeout, &publish
       else
         publish.()
       end
@@ -237,24 +222,6 @@ module Fluffle
         response['data'] = err.data if err.respond_to? :data
 
         response
-      end
-    end
-
-    # Wraps a block (which should publish a message) with a blocking check
-    #   that the client received a confirmation from the RabbitMQ server
-    #   that the message that was received and routed successfully
-    def with_confirmation(timeout:)
-      tag = @channel.next_publish_seq_no
-      confirm_ivar = Concurrent::IVar.new
-      @pending_confirms[tag] = confirm_ivar
-
-      yield
-
-      nack = confirm_ivar.value timeout
-      if confirm_ivar.incomplete?
-        raise Errors::TimeoutError.new('Timed out waiting for confirm')
-      elsif nack
-        raise Errors::NackError.new('Received nack from confirmation')
       end
     end
   end

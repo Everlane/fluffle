@@ -29,8 +29,8 @@ module Fluffle
       @prng = Random.new
 
       if confirms
-        @pending_confirms = Concurrent::Map.new
-        confirm_select
+        @confirmer = Fluffle::Confirmer.new channel: @channel
+        @confirmer.confirm_select
       end
 
       @pending_responses = Concurrent::Map.new
@@ -49,22 +49,6 @@ module Fluffle
           Fluffle.logger.error "[Fluffle::Client] #{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
         end
       end
-    end
-
-    def confirm_select
-      handle_confirm = ->(tag, _multiple, nack) do
-        ivar = @pending_confirms.delete tag
-
-        if ivar
-          ivar.set nack
-        else
-          self.logger.error "Missing confirm IVar: tag=#{tag}"
-        end
-      end
-
-      # Set the channel in confirmation mode so that we can receive confirms
-      # of published messages
-      @channel.confirm_select handle_confirm
     end
 
     # Fetch and set the `IVar` with a response from the server. This method is
@@ -129,10 +113,14 @@ module Fluffle
       response_ivar = Concurrent::IVar.new
       @pending_responses[id] = response_ivar
 
+      publish = ->{
+        self.publish payload, queue: queue
+      }
+
       if confirms
-        with_confirmation(timeout: timeout) { publish payload, queue: queue }
+        @confirmer.with_confirmation timeout: timeout, &publish
       else
-        publish payload, queue: queue
+        publish.()
       end
 
       response = response_ivar.value timeout
@@ -151,24 +139,6 @@ module Fluffle
       arity  = (payload['params'] && payload['params'].length) || 0
 
       "#{method}/#{arity}"
-    end
-
-    # Wraps a block (which should publish a message) with a blocking check
-    #   that the client received a confirmation from the RabbitMQ server
-    #   that the message that was received and routed successfully
-    def with_confirmation(timeout:)
-      tag = @channel.next_publish_seq_no
-      confirm_ivar = Concurrent::IVar.new
-      @pending_confirms[tag] = confirm_ivar
-
-      yield
-
-      nack = confirm_ivar.value timeout
-      if confirm_ivar.incomplete?
-        raise_incomplete payload, 'confirm'
-      elsif nack
-        raise Errors::NackError.new('Received nack from confirmation')
-      end
     end
 
     # event_name - String describing what we timed out waiting for, should

@@ -3,6 +3,7 @@ require 'logger'
 
 require 'fluffle/version'
 require 'fluffle/client'
+require 'fluffle/confirmer'
 require 'fluffle/errors'
 require 'fluffle/handlers/base'
 require 'fluffle/handlers/delegator'
