@@ -27,10 +27,14 @@ module Fluffle
 
       handler = Fluffle::Handlers::Dispatcher.new(&block) if block
 
+      raise ArgumentError, 'Handler cannot be nil' if handler.nil?
+
       @handlers[queue.to_s] = handler
     end
 
     def start
+      @handlers.freeze
+
       @channel  = @connection.create_channel
       @exchange = @channel.default_exchange
 
