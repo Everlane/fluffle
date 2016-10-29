@@ -8,6 +8,7 @@ require 'fluffle/errors'
 require 'fluffle/handlers/base'
 require 'fluffle/handlers/delegator'
 require 'fluffle/handlers/dispatcher'
+require 'fluffle/middleware_stack'
 require 'fluffle/server'
 
 module Fluffle

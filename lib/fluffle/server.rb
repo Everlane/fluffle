@@ -119,15 +119,17 @@ module Fluffle
         }
       end
 
-      publish = ->{
-        @exchange.publish Oj.dump(response), routing_key: reply_to,
-                                             correlation_id: response['id']
-      }
+      stack = Fluffle::MiddlewareStack.new
 
       if confirms
-        @confirmer.with_confirmation timeout: publish_timeout, &publish
-      else
-        publish.()
+        stack.push ->(publish) {
+          @confirmer.with_confirmation timeout: publish_timeout, &publish
+        }
+      end
+
+      stack.call do
+        @exchange.publish Oj.dump(response), routing_key: reply_to,
+                                             correlation_id: response['id']
       end
     end
 

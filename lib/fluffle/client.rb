@@ -113,14 +113,16 @@ module Fluffle
       response_ivar = Concurrent::IVar.new
       @pending_responses[id] = response_ivar
 
-      publish = ->{
-        self.publish payload, queue: queue
-      }
+      stack = Fluffle::MiddlewareStack.new
 
       if confirms
-        @confirmer.with_confirmation timeout: timeout, &publish
-      else
-        publish.()
+        stack.push ->(publish) {
+          @confirmer.with_confirmation timeout: timeout, &publish
+        }
+      end
+
+      stack.call do
+        publish payload, queue: queue
       end
 
       response = response_ivar.value timeout
