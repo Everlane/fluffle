@@ -10,13 +10,15 @@ module Fluffle
     include Connectable
 
     attr_reader :confirms
+    attr_reader :mandatory
     attr_accessor :default_timeout
     attr_accessor :logger
 
-    def initialize(url: nil, connection: nil, confirms: false)
+    def initialize(url: nil, connection: nil, confirms: false, mandatory: false)
       self.connect(url || connection)
 
       @confirms        = confirms
+      @mandatory       = mandatory
       @default_timeout = 5
       @logger          = Fluffle.logger
 
@@ -33,6 +35,10 @@ module Fluffle
         @confirmer.confirm_select
       end
 
+      if mandatory
+        handle_returns
+      end
+
       @pending_responses = Concurrent::Map.new
       subscribe
     end
@@ -47,6 +53,20 @@ module Fluffle
           # Bunny will let uncaptured errors silently wreck the reply thread,
           # so we must be extra-careful about capturing them
           Fluffle.logger.error "[Fluffle::Client] #{err.class}: #{err.message}\n#{err.backtrace.join("\n")}"
+        end
+      end
+    end
+
+    def handle_returns
+      @exchange.on_return do |return_info, properties, payload|
+        id   = properties[:correlation_id]
+        ivar = @pending_responses.delete id
+
+        if ivar
+          message = Kernel.sprintf "Received return from exchange for routing key `%s' (%d %s)", return_info.routing_key, return_info.reply_code, return_info.reply_text
+
+          error = Fluffle::Errors::ReturnError.new message
+          ivar.set error
         end
       end
     end
@@ -116,9 +136,9 @@ module Fluffle
       stack = Fluffle::MiddlewareStack.new
 
       if confirms
-        stack.push ->(publish) {
+        stack.push ->(publish) do
           @confirmer.with_confirmation timeout: timeout, &publish
-        }
+        end
       end
 
       stack.call do
@@ -126,7 +146,14 @@ module Fluffle
       end
 
       response = response_ivar.value timeout
-      raise_incomplete(payload, 'response') if response_ivar.incomplete?
+
+      if response_ivar.incomplete?
+        raise Errors::TimeoutError.new("Timed out waiting for response to `#{describe_payload(payload)}'")
+      elsif response.is_a? StandardError
+        # Exchange returns will preempt the response and set it to an error
+        # that we can raise
+        raise response
+      end
 
       return response
     ensure
@@ -143,17 +170,12 @@ module Fluffle
       "#{method}/#{arity}"
     end
 
-    # event_name - String describing what we timed out waiting for, should
-    #   be 'response' or 'confirm'
-    def raise_incomplete(payload, event_name)
-      raise Errors::TimeoutError.new("Timed out waiting for #{event_name} to `#{describe_payload(payload)}'")
-    end
-
     def publish(payload, queue:)
       opts = {
         routing_key: Fluffle.request_queue_name(queue),
         correlation_id: payload['id'],
-        reply_to: @reply_queue.name
+        reply_to: @reply_queue.name,
+        mandatory: @mandatory,
       }
 
       @exchange.publish Oj.dump(payload), opts

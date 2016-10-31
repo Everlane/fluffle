@@ -13,6 +13,10 @@ module Fluffle
     class TimeoutError < StandardError
     end
 
+    # Raised if it received a return from the server
+    class ReturnError < StandardError
+    end
+
     # Raise this within your own code to get an error that will be faithfully
     # translated into the code, message, and data member fields of the
     # spec's `Error` response object
