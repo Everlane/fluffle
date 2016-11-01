@@ -58,7 +58,7 @@ module Fluffle
     end
 
     def handle_returns
-      @exchange.on_return do |return_info, properties, payload|
+      @exchange.on_return do |return_info, properties, _payload|
         id   = properties[:correlation_id]
         ivar = @pending_responses.delete id
 
