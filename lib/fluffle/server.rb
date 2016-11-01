@@ -46,6 +46,9 @@ module Fluffle
       @channel  = @connection.create_channel
       @exchange = @channel.default_exchange
 
+      # Ensure we only receive 1 message at a time for each consumer
+      @channel.prefetch 1
+
       if confirms
         @confirmer = Fluffle::Confirmer.new channel: @channel
         @confirmer.confirm_select
