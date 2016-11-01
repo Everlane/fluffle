@@ -135,6 +135,9 @@ module Fluffle
           @next_publish_seq_no
         end
 
+        def prefetch(number, global = false)
+        end
+
         def queue(name, **opts)
           opts = opts.merge server: @server
 
