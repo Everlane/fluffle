@@ -167,6 +167,9 @@ module Fluffle
         def publish(payload, opts)
           @channel.publish payload, opts
         end
+
+        def on_return(&block)
+        end
       end
 
       class Queue
