@@ -6,7 +6,7 @@ module Fluffle
     include Connectable
 
     attr_reader :confirms, :connection, :handlers, :handler_pool, :mandatory
-    attr_accessor :publish_timeout
+    attr_accessor :publish_timeout, :shutdown_timeout
 
     # url:         - Optional URL to pass to `Bunny.new` to immediately connect
     # concurrency: - Number of threads to handle messages on (default: 1)
@@ -15,9 +15,10 @@ module Fluffle
       url_or_connection = url || connection
       self.connect(url_or_connection) if url_or_connection
 
-      @confirms        = confirms
-      @mandatory       = mandatory
-      @publish_timeout = 5
+      @confirms         = confirms
+      @mandatory        = mandatory
+      @publish_timeout  = 5
+      @shutdown_timeout = 15
 
       @handlers     = {}
       @handler_pool = Concurrent::FixedThreadPool.new concurrency
@@ -109,7 +110,15 @@ module Fluffle
         signal    = readables.first.gets.strip
 
         Fluffle.logger.info "Received #{signal}; shutting down..."
+
         @channel.work_pool.shutdown
+
+        @handler_pool.shutdown
+        unless @handler_pool.wait_for_termination(@shutdown_timeout)
+          # `wait_for_termination` returns false if it didn't shut down in time,
+          # so we need to kill it
+          @handler_pool.kill
+        end
 
         return
       end
