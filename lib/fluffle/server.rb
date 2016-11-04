@@ -111,7 +111,7 @@ module Fluffle
 
         Fluffle.logger.info "Received #{signal}; shutting down..."
 
-        @channel.work_pool.shutdown
+        @channel.close
 
         @handler_pool.shutdown
         unless @handler_pool.wait_for_termination(@shutdown_timeout)

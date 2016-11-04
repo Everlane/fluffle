@@ -122,10 +122,6 @@ module Fluffle
           @default_exchange ||= Exchange.new(@server, self)
         end
 
-        def work_pool
-          @work_pool ||= WorkPool.new
-        end
-
         def confirm_select(block = nil)
           @confirm_select      = block
           @next_publish_seq_no = 1
@@ -158,6 +154,9 @@ module Fluffle
 
         def ack(delivery_tag, multiple = false)
           true
+        end
+
+        def close
         end
       end
 
