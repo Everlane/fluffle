@@ -38,7 +38,7 @@ module Fluffle
 
       nack = confirm_ivar.value timeout
       if confirm_ivar.incomplete?
-        raise Errors::TimeoutError.new('Timed out waiting for confirm')
+        raise Errors::ConfirmTimeoutError.new('Timed out waiting for confirm')
       elsif nack
         raise Errors::NackError.new('Received nack from confirmation')
       end

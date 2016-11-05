@@ -13,6 +13,10 @@ module Fluffle
     class TimeoutError < StandardError
     end
 
+    # Raised if it timed out waiting for a confirm from the broker
+    class ConfirmTimeoutError < TimeoutError
+    end
+
     # Raised if it received a return from the server
     class ReturnError < StandardError
     end
