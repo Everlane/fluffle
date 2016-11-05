@@ -22,6 +22,7 @@ module Fluffle
 
       @handlers     = {}
       @handler_pool = Concurrent::FixedThreadPool.new concurrency
+      @consumers    = []
 
       self.class.default_server ||= self
     end
@@ -66,7 +67,7 @@ module Fluffle
         qualified_name = Fluffle.request_queue_name name
         queue          = @channel.queue qualified_name
 
-        queue.subscribe(manual_ack: true) do |delivery_info, properties, payload|
+        consumer = queue.subscribe(manual_ack: true) do |delivery_info, properties, payload|
           @handler_pool.post do
             begin
               handle_request handler: handler,
@@ -80,6 +81,8 @@ module Fluffle
             end
           end
         end
+
+        @consumers << consumer
       end
 
       self.wait_for_signal
@@ -111,14 +114,19 @@ module Fluffle
 
         Fluffle.logger.info "Received #{signal}; shutting down..."
 
-        @channel.close
+        # First stop the consumers from receiving messages
+        @consumers.each &:cancel
 
+        # Then wait for worker pools to finish processing their active jobs
         @handler_pool.shutdown
         unless @handler_pool.wait_for_termination(@shutdown_timeout)
           # `wait_for_termination` returns false if it didn't shut down in time,
           # so we need to kill it
           @handler_pool.kill
         end
+
+        # Finally close the connection
+        @channel.close
 
         return
       end
