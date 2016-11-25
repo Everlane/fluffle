@@ -17,6 +17,10 @@ module Fluffle
     class ConfirmTimeoutError < TimeoutError
     end
 
+    # Raised if it received a nack from the broker
+    class NackError < StandardError
+    end
+
     # Raised if it received a return from the server
     class ReturnError < StandardError
     end
