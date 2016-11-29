@@ -7,9 +7,9 @@ module Fluffle
 
       # This is called *after* the server has published the response message
       # to the client's queue.
-      def after_response(request:)
-        nil
-      end
+      # def after_response(request:)
+      #   ...
+      # end
     end
   end
 end
