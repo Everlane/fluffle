@@ -165,7 +165,11 @@ module Fluffle
       end
 
       if handler.respond_to? :after_response
-        handler.after_response request: request
+        begin
+          handler.after_response request: request
+        rescue => err
+          log_error(err) if Fluffle.logger.error?
+        end
       end
     end
 
