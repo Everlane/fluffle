@@ -128,5 +128,23 @@ describe Fluffle::Server do
         expect(meta['handler_duration']).to be >= 0.01
       end
     end
+
+    it "calls the handler's #after_response method if defined" do
+      @params = ['foo']
+
+      result = 'bar'
+      handler = double 'Handler'
+      expect(handler).to receive(:call).ordered.and_return(result)
+
+      expect(handler).to receive(:after_response).ordered do |opts|
+        expect(opts[:request]).to include({
+          'params' => @params,
+        })
+      end
+
+      make_request handler: handler
+
+      expect_response payload: { 'result' => result }
+    end
   end
 end

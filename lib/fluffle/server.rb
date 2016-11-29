@@ -163,6 +163,10 @@ module Fluffle
         @exchange.publish Oj.dump(response), routing_key: reply_to,
                                              correlation_id: response['id']
       end
+
+      if handler.respond_to? :after_response
+        handler.after_response request: request
+      end
     end
 
     # handler - Instance of a `Handler` that may receive `#call`
